@@ -146,6 +146,8 @@ FOUNDATION_EXPORT NSString * const ASRenderingEngineDidDisplayNodesScheduledBefo
   NSTimeInterval _defaultLayoutTransitionDuration;
   NSTimeInterval _defaultLayoutTransitionDelay;
   UIViewAnimationOptions _defaultLayoutTransitionOptions;
+  
+  ASLayoutSpecBlock _layoutSpecBlock;
 
   int32_t _transitionID;
   BOOL _transitionInProgress;
