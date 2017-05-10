@@ -122,22 +122,40 @@ NSString *NSStringFromASHierarchyChangeType(_ASHierarchyChangeType changeType);
 - (instancetype)initWithOldData:(std::vector<NSInteger>)oldItemCounts NS_DESIGNATED_INITIALIZER;
 
 /**
- * Append the given completion handler to the combined @c completionHandler.
+ * Append the given did-commit handler to the combined @c completionHandler.
  *
  * @discussion Since batch updates can be nested, we have to support multiple
- * completion handlers per update.
+ * animation completion handlers per update.
  *
  * @precondition The change set must not be completed.
  */
-- (void)addCompletionHandler:(nullable void(^)(BOOL finished))completion;
+- (void)addCommitHandler:(nullable void(^)())completion;
 
 /**
- * Execute the combined completion handler.
+ * Append the given animation completion handler to the combined @c completionHandler.
+ *
+ * @discussion Since batch updates can be nested, we have to support multiple
+ * animation completion handlers per update.
+ *
+ * @precondition The change set must not be completed.
+ */
+- (void)addAnimationCompletionHandler:(nullable void(^)(BOOL finished))completion;
+
+/**
+ * Execute the combined did-commit handler.
  *
  * @warning The completion block is discarded after reading because it may have captured
  *   significant resources that we would like to reclaim as soon as possible.
  */
-- (void)executeCompletionHandlerWithFinished:(BOOL)finished;
+- (void)executeCommitHandler;
+
+/**
+ * Execute the combined animation completion handler.
+ *
+ * @warning The completion block is discarded after reading because it may have captured
+ *   significant resources that we would like to reclaim as soon as possible.
+ */
+- (void)executeAnimationCompletionHandlerWithFinished:(BOOL)finished;
 
 /**
  * Get the section index after the update for the given section before the update.

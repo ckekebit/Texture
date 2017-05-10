@@ -491,7 +491,8 @@ typedef void (^ASDataControllerCompletionBlock)(NSArray<ASCollectionElement *> *
   // See ASUICollectionViewTests.testThatIssuingAnUpdateBeforeInitialReloadIsUnacceptable
   // for the issue that UICollectionView has that we're choosing to workaround.
   if (!_initialReloadDataHasBeenCalled) {
-    [changeSet executeCompletionHandlerWithFinished:YES];
+    [changeSet executeCommitHandler];
+    [changeSet executeAnimationCompletionHandlerWithFinished:YES];
     return;
   }
   

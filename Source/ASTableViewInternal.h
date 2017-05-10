@@ -70,4 +70,6 @@
 /// Returns the width of the section index view on the right-hand side of the table, if one is present.
 - (CGFloat)sectionIndexWidth;
 
+- (void)endUpdatesAnimated:(BOOL)animated didCommitToView:(void (^)())didCommitToView animationCompletion:(void (^)(BOOL finished))animationCompletion;
+
 @end

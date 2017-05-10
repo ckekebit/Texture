@@ -170,25 +170,31 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)relayoutItems;
 
 /**
- *  Perform a batch of updates asynchronously, optionally disabling all animations in the batch. This method must be called from the main thread.
+ *  Perform a batch of updates asynchronously. This method must be called from the main thread.
  *  The data source must be updated to reflect the changes before the update block completes.
  *
- *  @param animated   NO to disable animations for this batch
- *  @param updates    The block that performs the relevant insert, delete, reload, or move operations.
- *  @param completion A completion handler block to execute when all of the operations are finished. This block takes a single
- *                    Boolean parameter that contains the value YES if all of the related animations completed successfully or
- *                    NO if they were interrupted. This parameter may be nil. If supplied, the block is run on the main thread.
+ *  @param updates               The block that performs the relevant insert, delete, reload, or move operations.
+ *  @param didCommitToView       A block called immediately after the update is submitted to the view.
+ *  @param animationCompletion   A completion handler block to execute when the update animations are finished. This block takes a single
+ *                               Boolean parameter that contains the value YES if all of the related animations completed successfully or
+ *                               NO if they were interrupted. This parameter may be nil. If supplied, the block is run on the main thread.
+ *
+ *  @note You can wrap this in `[UIView performWithoutAnimation:]` to suppress animation for the updates.
  */
-- (void)performBatchAnimated:(BOOL)animated updates:(nullable AS_NOESCAPE void (^)())updates completion:(nullable void (^)(BOOL finished))completion;
+- (void)performBatchUpdates:(nullable AS_NOESCAPE void (^)())updates
+            didCommitToView:(nullable void (^)())didCommitToView
+        animationCompletion:(nullable void (^)(BOOL finished))animationCompletion;
 
 /**
- *  Perform a batch of updates asynchronously, optionally disabling all animations in the batch. This method must be called from the main thread.
+ *  Perform a batch of updates asynchronously. This method must be called from the main thread.
  *  The data source must be updated to reflect the changes before the update block completes.
  *
- *  @param updates    The block that performs the relevant insert, delete, reload, or move operations.
- *  @param completion A completion handler block to execute when all of the operations are finished. This block takes a single
- *                    Boolean parameter that contains the value YES if all of the related animations completed successfully or
- *                    NO if they were interrupted. This parameter may be nil. If supplied, the block is run on the main thread.
+ *  @param updates               The block that performs the relevant insert, delete, reload, or move operations.
+ *  @param animationCompletion   A completion handler block to execute when the update animations are finished. This block takes a single
+ *                               Boolean parameter that contains the value YES if all of the related animations completed successfully or
+ *                               NO if they were interrupted. This parameter may be nil. If supplied, the block is run on the main thread.
+ *
+ *  @note You can wrap this in `[UIView performWithoutAnimation:]` to suppress animation for the updates.
  */
 - (void)performBatchUpdates:(nullable AS_NOESCAPE void (^)())updates completion:(nullable void (^)(BOOL finished))completion;
 
@@ -433,6 +439,22 @@ NS_ASSUME_NONNULL_BEGIN
  * @discussion This method must be called from the main thread.
  */
 - (NSArray<NSIndexPath *> *)indexPathsForVisibleRows AS_WARN_UNUSED_RESULT;
+
+@end
+
+@interface ASTableNode (Deprecated)
+
+/**
+ *  Perform a batch of updates asynchronously, optionally disabling all animations in the batch. This method must be called from the main thread.
+ *  The data source must be updated to reflect the changes before the update block completes.
+ *
+ *  @param animated   NO to disable animations for this batch
+ *  @param updates    The block that performs the relevant insert, delete, reload, or move operations.
+ *  @param completion A completion handler block to execute when all of the operations are finished. This block takes a single
+ *                    Boolean parameter that contains the value YES if all of the related animations completed successfully or
+ *                    NO if they were interrupted. This parameter may be nil. If supplied, the block is run on the main thread.
+ */
+- (void)performBatchAnimated:(BOOL)animated updates:(nullable AS_NOESCAPE void (^)())updates completion:(nullable void (^)(BOOL finished))completion ASDISPLAYNODE_DEPRECATED_MSG("Call `performBatchUpdates:completion:` instead. Use [UIView performWithoutAnimation:] to suppress animation.");
 
 @end
 

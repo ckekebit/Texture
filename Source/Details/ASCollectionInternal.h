@@ -53,9 +53,10 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (nullable NSArray<NSIndexPath *> *)convertIndexPathsToCollectionNode:(nullable NSArray<NSIndexPath *> *)indexPaths;
 
-- (void)beginUpdates;
-
-- (void)endUpdatesAnimated:(BOOL)animated completion:(nullable void (^)(BOOL))completion;
+- (void)performBatchAnimated:(BOOL)animated
+                     updates:(nullable void (^)())updates
+             didCommitToView:(nullable void (^)())didCommitToView
+         animationCompletion:(nullable void (^)(BOOL finished))animationCompletion;
 
 @end
 

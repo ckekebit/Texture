@@ -795,46 +795,36 @@ static NSString * const kReuseIdentifier = @"_ASCollectionReuseIdentifier";
   return _dataController;
 }
 
-- (void)beginUpdates
+- (void)performBatchAnimated:(BOOL)animated updates:(void (^)())updates didCommitToView:(void (^)())didCommitToView animationCompletion:(void (^)(BOOL finished))animationCompletion
 {
   ASDisplayNodeAssertMainThread();
   // _changeSet must be available during batch update
   ASDisplayNodeAssertTrue((_batchUpdateCount > 0) == (_changeSet != nil));
-  
+
   if (_batchUpdateCount == 0) {
     _changeSet = [[_ASHierarchyChangeSet alloc] initWithOldData:[_dataController itemCountsFromDataSource]];
   }
-  _batchUpdateCount++;  
-}
-
-- (void)endUpdatesAnimated:(BOOL)animated completion:(nullable void (^)(BOOL))completion
-{
-  ASDisplayNodeAssertMainThread();
-  ASDisplayNodeAssertNotNil(_changeSet, @"_changeSet must be available when batch update ends");
-
-  _batchUpdateCount--;
-  // Prevent calling endUpdatesAnimated:completion: in an unbalanced way
-  NSAssert(_batchUpdateCount >= 0, @"endUpdatesAnimated:completion: called without having a balanced beginUpdates call");
-  
-  [_changeSet addCompletionHandler:completion];
-  
-  if (_batchUpdateCount == 0) {
-    _ASHierarchyChangeSet *changeSet = _changeSet;
-    // Nil out _changeSet before forwarding to _dataController to allow the change set to cause subsequent batch updates on the same run loop
-    _changeSet = nil;
-    changeSet.animated = animated;
-    [_dataController updateWithChangeSet:changeSet];
+  _batchUpdateCount++;
+  if (updates) {
+    updates();
   }
+  _batchUpdateCount--;
+
+  [_changeSet addCommitHandler:didCommitToView];
+  [_changeSet addAnimationCompletionHandler:animationCompletion];
+
+   if (_batchUpdateCount == 0) {
+     _ASHierarchyChangeSet *changeSet = _changeSet;
+     // Nil out _changeSet before forwarding to _dataController to allow the change set to cause subsequent batch updates on the same run loop
+     _changeSet = nil;
+     changeSet.animated = animated;
+     [_dataController updateWithChangeSet:changeSet];
+   }
 }
 
 - (void)performBatchAnimated:(BOOL)animated updates:(void (^)())updates completion:(void (^)(BOOL))completion
 {
-  ASDisplayNodeAssertMainThread();
-  [self beginUpdates];
-  if (updates) {
-    updates();
-  }
-  [self endUpdatesAnimated:animated completion:completion];
+  [self performBatchAnimated:animated updates:updates didCommitToView:nil animationCompletion:completion];
 }
 
 - (void)performBatchUpdates:(void (^)())updates completion:(void (^)(BOOL))completion
@@ -1884,7 +1874,8 @@ static NSString * const kReuseIdentifier = @"_ASCollectionReuseIdentifier";
 {
   ASDisplayNodeAssertMainThread();
   if (!self.asyncDataSource || _superIsPendingDataLoad) {
-    [changeSet executeCompletionHandlerWithFinished:NO];
+    [changeSet executeCommitHandler];
+    [changeSet executeAnimationCompletionHandlerWithFinished:NO];
     return; // if the asyncDataSource has become invalid while we are processing, ignore this request to avoid crashes
   }
   
@@ -1892,7 +1883,8 @@ static NSString * const kReuseIdentifier = @"_ASCollectionReuseIdentifier";
     if(changeSet.includesReloadData) {
       _superIsPendingDataLoad = YES;
       [super reloadData];
-      [changeSet executeCompletionHandlerWithFinished:YES];
+      [changeSet executeCommitHandler];
+      [changeSet executeAnimationCompletionHandlerWithFinished:YES];
     } else {
       [_layoutFacilitator collectionViewWillPerformBatchUpdates];
       
@@ -1927,11 +1919,12 @@ static NSString * const kReuseIdentifier = @"_ASCollectionReuseIdentifier";
           [super insertItemsAtIndexPaths:change.indexPaths];
           numberOfUpdates++;
         }
+        [changeSet executeCommitHandler];
       } completion:^(BOOL finished){
         // Flush any range changes that happened as part of the update animations ending.
         [_rangeController updateIfNeeded];
         [self _scheduleCheckForBatchFetchingForNumberOfChanges:numberOfUpdates];
-        [changeSet executeCompletionHandlerWithFinished:finished];
+        [changeSet executeAnimationCompletionHandlerWithFinished:finished];
       }];
       
       // Flush any range changes that happened as part of submitting the update.

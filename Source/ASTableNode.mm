@@ -602,7 +602,7 @@ ASLayoutElementCollectionTableSetTraitCollection(_environmentStateLock)
   [self.view relayoutItems];
 }
 
-- (void)performBatchAnimated:(BOOL)animated updates:(void (^)())updates completion:(void (^)(BOOL))completion
+- (void)_performBatchAnimated:(BOOL)animated updates:(void (^)())updates didCommitToView:(void (^)())didCommitToView animationCompletion:(void (^)(BOOL finished))animationCompletion
 {
   ASDisplayNodeAssertMainThread();
   if (self.nodeLoaded) {
@@ -611,17 +611,33 @@ ASLayoutElementCollectionTableSetTraitCollection(_environmentStateLock)
     if (updates) {
       updates();
     }
-    [tableView endUpdatesAnimated:animated completion:completion];
+    [tableView endUpdatesAnimated:animated didCommitToView:didCommitToView animationCompletion:animationCompletion];
   } else {
     if (updates) {
       updates();
     }
+    if (didCommitToView) {
+      didCommitToView();
+    }
+    if (animationCompletion) {
+      animationCompletion(YES);
+    }
   }
+}
+
+- (void)performBatchUpdates:(void (^)())updates didCommitToView:(void (^)())didCommitToView animationCompletion:(void (^)(BOOL))animationCompletion
+{
+  [self _performBatchAnimated:UIView.areAnimationsEnabled updates:updates didCommitToView:didCommitToView animationCompletion:animationCompletion];
+}
+
+- (void)performBatchAnimated:(BOOL)animated updates:(void (^)())updates completion:(void (^)(BOOL))completion
+{
+  [self _performBatchAnimated:animated updates:updates didCommitToView:nil animationCompletion:completion];
 }
 
 - (void)performBatchUpdates:(void (^)())updates completion:(void (^)(BOOL))completion
 {
-  [self performBatchAnimated:YES updates:updates completion:completion];
+  [self _performBatchAnimated:UIView.areAnimationsEnabled updates:updates didCommitToView:nil animationCompletion:completion];
 }
 
 - (void)insertSections:(NSIndexSet *)sections withRowAnimation:(UITableViewRowAnimation)animation

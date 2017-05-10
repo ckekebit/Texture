@@ -122,7 +122,8 @@ NSString *NSStringFromASHierarchyChangeType(_ASHierarchyChangeType changeType)
 @implementation _ASHierarchyChangeSet {
   std::vector<NSInteger> _oldItemCounts;
   std::vector<NSInteger> _newItemCounts;
-  void (^_completionHandler)(BOOL finished);
+  void (^_animationCompletionHandler)(BOOL finished);
+  void (^_commitHandler)();
 }
 
 - (instancetype)init
@@ -159,15 +160,31 @@ NSString *NSStringFromASHierarchyChangeType(_ASHierarchyChangeType changeType)
   return (! _includesReloadData) && (! [self _includesPerItemOrSectionChanges]);
 }
 
-- (void)addCompletionHandler:(void (^)(BOOL))completion
+- (void)addCommitHandler:(void (^)())completion
 {
   [self _ensureNotCompleted];
   if (completion == nil) {
     return;
   }
 
-  void (^oldCompletionHandler)(BOOL finished) = _completionHandler;
-  _completionHandler = ^(BOOL finished) {
+  void (^oldCompletionHandler)() = _commitHandler;
+  _commitHandler = ^() {
+    if (oldCompletionHandler != nil) {
+      oldCompletionHandler();
+    }
+    completion();
+  };
+}
+
+- (void)addAnimationCompletionHandler:(void (^)(BOOL))completion
+{
+  [self _ensureNotCompleted];
+  if (completion == nil) {
+    return;
+  }
+
+  void (^oldCompletionHandler)(BOOL finished) = _animationCompletionHandler;
+  _animationCompletionHandler = ^(BOOL finished) {
     if (oldCompletionHandler != nil) {
     	oldCompletionHandler(finished);
     }
@@ -175,11 +192,19 @@ NSString *NSStringFromASHierarchyChangeType(_ASHierarchyChangeType changeType)
   };
 }
 
-- (void)executeCompletionHandlerWithFinished:(BOOL)finished
+- (void)executeCommitHandler
 {
-  if (_completionHandler != nil) {
-    _completionHandler(finished);
-    _completionHandler = nil;
+  if (_commitHandler != nil) {
+    _commitHandler();
+    _commitHandler = nil;
+  }
+}
+
+- (void)executeAnimationCompletionHandlerWithFinished:(BOOL)finished
+{
+  if (_animationCompletionHandler != nil) {
+    _animationCompletionHandler(finished);
+    _animationCompletionHandler = nil;
   }
 }
 

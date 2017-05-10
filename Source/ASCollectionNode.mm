@@ -603,24 +603,39 @@
   [self.view registerSupplementaryNodeOfKind:elementKind];
 }
 
-- (void)performBatchAnimated:(BOOL)animated updates:(void (^)())updates completion:(void (^)(BOOL))completion
+/// This private method is only here to support the old `animated` parameter that we used to accept.
+/// When that deprecated method is removed, we can put this code directly in the public method.
+- (void)_performBatchAnimated:(BOOL)animated updates:(void (^)())updates didCommitToView:(void (^)())didCommitToView animationCompletion:(void (^)(BOOL))animationCompletion
 {
   ASDisplayNodeAssertMainThread();
   if (self.nodeLoaded) {
-    [self.view performBatchAnimated:animated updates:updates completion:completion];
+    [self.view performBatchAnimated:animated updates:updates completion:animationCompletion];
   } else {
     if (updates) {
       updates();
     }
-    if (completion) {
-      completion(YES);
+    if (didCommitToView) {
+      didCommitToView();
+    }
+    if (animationCompletion) {
+      animationCompletion(YES);
     }
   }
 }
 
+- (void)performBatchUpdates:(void (^)())updates didCommitToView:(void (^)())didCommitToView animationCompletion:(void (^)(BOOL))animationCompletion
+{
+  [self _performBatchAnimated:UIView.areAnimationsEnabled updates:updates didCommitToView:didCommitToView animationCompletion:animationCompletion];
+}
+
+- (void)performBatchAnimated:(BOOL)animated updates:(void (^)())updates completion:(void (^)(BOOL))completion
+{
+  [self _performBatchAnimated:animated updates:updates didCommitToView:nil animationCompletion:completion];
+}
+
 - (void)performBatchUpdates:(void (^)())updates completion:(void (^)(BOOL))completion
 {
-  [self performBatchAnimated:UIView.areAnimationsEnabled updates:updates completion:completion];
+  [self _performBatchAnimated:UIView.areAnimationsEnabled updates:updates didCommitToView:nil animationCompletion:completion];
 }
 
 - (void)waitUntilAllUpdatesAreCommitted
@@ -652,27 +667,6 @@
 - (void)reloadDataImmediately
 {
   [self.view reloadDataImmediately];
-}
-
-- (void)beginUpdates
-{
-  ASDisplayNodeAssertMainThread();
-  if (self.nodeLoaded) {
-    [self.view beginUpdates];
-  }
-}
-
-- (void)endUpdatesAnimated:(BOOL)animated
-{
-  [self endUpdatesAnimated:animated completion:nil];
-}
-
-- (void)endUpdatesAnimated:(BOOL)animated completion:(void (^)(BOOL))completion
-{
-  ASDisplayNodeAssertMainThread();
-  if (self.nodeLoaded) {
-    [self.view endUpdatesAnimated:animated completion:completion];
-  }
 }
 
 - (void)insertSections:(NSIndexSet *)sections

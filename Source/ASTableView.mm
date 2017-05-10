@@ -691,35 +691,40 @@ static NSString * const kCellReuseIdentifier = @"_ASTableViewCell";
   _batchUpdateCount++;
 }
 
+- (void)endUpdatesAnimated:(BOOL)animated didCommitToView:(void (^)())didCommitToView animationCompletion:(void (^)(BOOL))animationCompletion
+{
+  ASDisplayNodeAssertMainThread();
+  ASDisplayNodeAssertNotNil(_changeSet, @"_changeSet must be available when batch update ends");
+
+  _batchUpdateCount--;
+  // Prevent calling endUpdatesAnimated:completion: in an unbalanced way
+  NSAssert(_batchUpdateCount >= 0, @"endUpdatesAnimated:completion: called without having a balanced beginUpdates call");
+
+  [_changeSet addCommitHandler:didCommitToView];
+  [_changeSet addAnimationCompletionHandler:animationCompletion];
+
+   if (_batchUpdateCount == 0) {
+     _ASHierarchyChangeSet *changeSet = _changeSet;
+     // Nil out _changeSet before forwarding to _dataController to allow the change set to cause subsequent batch updates on the same run loop
+     _changeSet = nil;
+     changeSet.animated = animated;
+     [_dataController updateWithChangeSet:changeSet];
+   }
+}
+
 - (void)endUpdates
 {
-  [self endUpdatesWithCompletion:nil];
+  [self endUpdatesAnimated:UIView.areAnimationsEnabled didCommitToView:nil animationCompletion:nil];
 }
 
 - (void)endUpdatesWithCompletion:(void (^)(BOOL completed))completion
 {
-  // We capture the current state of whether animations are enabled if they don't provide us with one.
-  [self endUpdatesAnimated:[UIView areAnimationsEnabled] completion:completion];
+  [self endUpdatesAnimated:UIView.areAnimationsEnabled didCommitToView:nil animationCompletion:completion];
 }
 
 - (void)endUpdatesAnimated:(BOOL)animated completion:(void (^)(BOOL completed))completion
 {
-  ASDisplayNodeAssertMainThread();
-  ASDisplayNodeAssertNotNil(_changeSet, @"_changeSet must be available when batch update ends");
-  
-  _batchUpdateCount--;
-  // Prevent calling endUpdatesAnimated:completion: in an unbalanced way
-  NSAssert(_batchUpdateCount >= 0, @"endUpdatesAnimated:completion: called without having a balanced beginUpdates call");
-  
-  [_changeSet addCompletionHandler:completion];
-
-  if (_batchUpdateCount == 0) {
-    _ASHierarchyChangeSet *changeSet = _changeSet;
-    // Nil out _changeSet before forwarding to _dataController to allow the change set to cause subsequent batch updates on the same run loop
-    _changeSet = nil;
-    changeSet.animated = animated;
-    [_dataController updateWithChangeSet:changeSet];
-  } 
+  [self endUpdatesAnimated:animated didCommitToView:nil animationCompletion:completion];
 }
 
 - (void)waitUntilAllUpdatesAreCommitted
@@ -1499,22 +1504,22 @@ static NSString * const kCellReuseIdentifier = @"_ASTableViewCell";
 {
   ASDisplayNodeAssertMainThread();
   if (!self.asyncDataSource || _updatingInResponseToInteractiveMove) {
-    [changeSet executeCompletionHandlerWithFinished:NO];
+    [changeSet executeCommitHandler];
+    [changeSet executeAnimationCompletionHandlerWithFinished:NO];
     return; // if the asyncDataSource has become invalid while we are processing, ignore this request to avoid crashes
   }
   
   if (changeSet.includesReloadData) {
     LOG(@"UITableView reloadData");
-    ASPerformBlockWithoutAnimation(!changeSet.animated, ^{
-      if (self.test_enableSuperUpdateCallLogging) {
-        NSLog(@"-[super reloadData]");
-      }
-      [super reloadData];
-      // Flush any range changes that happened as part of submitting the reload.
-      [_rangeController updateIfNeeded];
-      [self _scheduleCheckForBatchFetchingForNumberOfChanges:1];
-      [changeSet executeCompletionHandlerWithFinished:YES];
-    });
+    if (self.test_enableSuperUpdateCallLogging) {
+      NSLog(@"-[super reloadData]");
+    }
+    [super reloadData];
+    // Flush any range changes that happened as part of submitting the reload.
+    [_rangeController updateIfNeeded];
+    [self _scheduleCheckForBatchFetchingForNumberOfChanges:1];
+    [changeSet executeCommitHandler];
+    [changeSet executeAnimationCompletionHandlerWithFinished:YES];
     return;
   }
   
@@ -1621,14 +1626,20 @@ static NSString * const kCellReuseIdentifier = @"_ASTableViewCell";
 
   LOG(@"--- UITableView endUpdates");
   ASPerformBlockWithoutAnimation(!changeSet.animated, ^{
-    [super endUpdates];
+    [CATransaction begin]; {
+      [CATransaction setCompletionBlock:^{
+        [changeSet executeAnimationCompletionHandlerWithFinished:YES];
+      }];
+      [super endUpdates];
+    }
+    [CATransaction commit];
     [_rangeController updateIfNeeded];
     [self _scheduleCheckForBatchFetchingForNumberOfChanges:numberOfUpdates];
   });
   if (_automaticallyAdjustsContentOffset) {
     [self endAdjustingContentOffsetAnimated:changeSet.animated];
   }
-  [changeSet executeCompletionHandlerWithFinished:YES];
+  [changeSet executeCommitHandler];
 }
 
 #pragma mark - ASDataControllerSource
